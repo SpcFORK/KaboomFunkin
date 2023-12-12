@@ -49,11 +49,33 @@ const
   
   [
     'WEEK_INJECTOR',
-    'FREEPLAY_INJECTOR'
+    'FREEPLAY_INJECTOR',
   ]
     .map((x) => {
       window[x] = {}
     })
+
+  /* 
+  POSSIBLE GLOBALLY
+  */
+
+  function createSafeSetter(name: string, value: any) {
+    return {
+      get [name]() {
+        return value
+      },
+
+      set [name](x) {
+        Object.assign(value, x)
+      },
+    }
+  }
+
+  Object.assign(window, {
+    ...createSafeSetter('GLOBAL_LOADED', GLOBAL_LOADED_FILES),
+    ...createSafeSetter('SOUND', SOUNDS),
+    ...createSafeSetter('SUPER_COMMON_COLOUR', SUPERCOMMONCOLOUR),
+  })
 }
 
 let CHROMEOS_FIX = !navigator.userAgent.includes('CrOS')
@@ -140,7 +162,6 @@ let CHROMEOS_FIX = !navigator.userAgent.includes('CrOS')
   loadSound('confirmMenu', 'sounds/confirmMenu.ogg')
   loadSound('cancelMenu', 'sounds/cancelMenu.ogg')
   loadSound('scrollMenu', 'sounds/scrollMenu.ogg')
-
 }
 
 
@@ -388,7 +409,7 @@ function createMenuStructure() {
           ...
           */
           add([
-            text('Week 1', {
+            text(Object.values(WEEKSONGS)[0].join('\n'), {
               size: 20,
             }),
             pos(segPosCenter(width(), 8, 75, 1), (height() / 2) + 125),
@@ -730,10 +751,10 @@ class ScrollableMenu {
 // ---
 
 
-var // tree 
-  player,
+var // tree
   notes = [],
-  ALLOWEDTOPLAYSOUND = false, awaitingFirstInput
+  ALLOWEDTOPLAYSOUND = false, 
+  awaitingFirstInput
 
 
 // ---
@@ -1039,7 +1060,7 @@ scene('storyMode', async () => {
     'Week 3': () => { }, // S&P vs BF
     'Week 4': () => { }, // MM vs BF
     'Week 5': () => { }, // DD&MM vs BF Crismah
-    'Week 6': () => { }, // S vs bf
+    'Week 6': () => { }, // S vs BF
     'Week 7': () => { }, // TKM vs BF
     [MOD_SYMBOL]: { ...window['WEEK_INJECTOR'] }
   }
@@ -1088,7 +1109,37 @@ scene('storyMode', async () => {
 })
 
 
+scene('credits', async () => {
 
+  quickEvent.$(['credits', 'init'])
+
+  let esc = createEscapeHandle('selectMenu')
+
+  let bg = await createFG()
+
+  let txt_ = add([
+    text('Loading...', {
+      size: 12*1.5,
+      font: 'apl386',
+      align: 'center',
+    }),
+    pos(width() / 2, height() / 2),
+    anchor('center'),
+  ]);
+
+  txt_.text = `
+SpectCOW (SpcFORK), Creator of KaboomFunkin.
+
+
+Thanks for playing!
+  `.trim()
+
+  txt_.width = width() - 64;
+  txt_.height = height() - 64;
+
+  await makeIntroTransition()
+  
+})
 
 
 // ---

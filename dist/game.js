@@ -4490,7 +4490,26 @@ vec4 frag(vec2 pos, vec2 uv, vec4 color, sampler2D tex) {
       var SUPERCOMMONCOLOUR = [248, 206, 86];
       var IS_IFRAME = window.location !== window.parent.location;
       var MOD_SYMBOL = Symbol.for("MOD");
-      window["WEEK_INJECTOR"] = {};
+      {
+        let createSafeSetter = function(name, value) {
+          return {
+            get [name]() {
+              return value;
+            },
+            set [name](x2) {
+              Object.assign(value, x2);
+            }
+          };
+        };
+        __name(createSafeSetter, "createSafeSetter");
+        [
+          "WEEK_INJECTOR",
+          "FREEPLAY_INJECTOR"
+        ].map((x2) => {
+          window[x2] = {};
+        });
+        Object.assign(window, __spreadValues(__spreadValues(__spreadValues({}, createSafeSetter("GLOBAL_LOADED", GLOBAL_LOADED_FILES)), createSafeSetter("SOUND", SOUNDS)), createSafeSetter("SUPER_COMMON_COLOUR", SUPERCOMMONCOLOUR)));
+      }
       var CHROMEOS_FIX = !navigator.userAgent.includes("CrOS");
       {
         loadSpriteAtlas("sprites/game/characters/beanfriend.png", {
@@ -4740,7 +4759,7 @@ vec4 frag(vec2 pos, vec2 uv, vec4 color, sampler2D tex) {
             ]),
             weekbar: () => ({
               leftText: add([
-                text("Week 1", {
+                text(Object.values(WEEKSONGS)[0].join("\n"), {
                   size: 20
                 }),
                 pos(segPosCenter(width(), 8, 75, 1), height() / 2 + 125),
@@ -4984,7 +5003,6 @@ vec4 frag(vec2 pos, vec2 uv, vec4 color, sampler2D tex) {
         }
       };
       __name(ScrollableMenu, "ScrollableMenu");
-      var player;
       var ALLOWEDTOPLAYSOUND = false;
       var awaitingFirstInput;
       scene("songLoaded", () => {
@@ -5229,6 +5247,29 @@ vec4 frag(vec2 pos, vec2 uv, vec4 color, sampler2D tex) {
             volume: 0.5
           });
         });
+        yield makeIntroTransition();
+      }));
+      scene("credits", () => __async(exports, null, function* () {
+        quickEvent_default.$(["credits", "init"]);
+        let esc = createEscapeHandle("selectMenu");
+        let bg = yield createFG();
+        let txt_ = add([
+          text("Loading...", {
+            size: 12 * 1.5,
+            font: "apl386",
+            align: "center"
+          }),
+          pos(width() / 2, height() / 2),
+          anchor("center")
+        ]);
+        txt_.text = `
+SpectCOW (SpcFORK), Creator of KaboomFunkin.
+
+
+Thanks for playing!
+  `.trim();
+        txt_.width = width() - 64;
+        txt_.height = height() - 64;
         yield makeIntroTransition();
       }));
       go("intro");

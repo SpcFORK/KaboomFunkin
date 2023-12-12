@@ -1,0 +1,12 @@
+<!-- KF FNF Week magic. -->
+<data>
+  <weekname>Week 1</weekname>
+  <topright>"Oh, Dearest"</topright>
+  <characters>
+    <left>Beanfriend</left>
+    <right>Enemy</right>
+  </characters>
+  <songs>
+    <song1>dadbattle</song1>
+  </songs>
+</data>

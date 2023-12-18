@@ -9,7 +9,7 @@ let om_ = {
     let ev = new CustomEvent(name, {
       detail: cb,
     })
-
+    
     return ev
   },
   $: (name: string | string[], cb?: object): boolean => {

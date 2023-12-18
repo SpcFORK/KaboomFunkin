@@ -1,0 +1,10 @@
+<data>
+  <playbacks>
+    <song>weeks/songs/dadbattle/song.ogg</song>
+    <vocals>weeks/songs/dadbattle/voices.ogg</vocals>
+  </playbacks>
+  <characters>
+    <left>Beanfriend</left>
+    <right>Enemy</right>
+  </characters>
+</data>

@@ -21,6 +21,10 @@ language="nodejs"
 [packager.features]
 packageSearch = true
 
+[languages.kaboomdraw]
+pattern = "**/*.{js,ts}"
+syntax = "kaboomdraw"
+
 [languages.javascript]
 pattern = "**/*.{js,ts}"
 syntax = "javascript"

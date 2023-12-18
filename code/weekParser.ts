@@ -1,15 +1,26 @@
 import SML from "./MLtoJSON"
+import * as kbg from "kaboom"
 
 interface Week {
 
   weekname: string,
   topLeft: string,
-  characters: {
-    left: string,
-    right: string,
-  },
   songs: Record<string, string>,
 
+}
+
+interface Day {
+
+  characters: Record<string, string>,
+  playbacks: Record<string, string>,
+  
+}
+
+interface DayLoaded {
+
+  characters: Record<string, string>,
+  playbacks: Record<string, kbg.SoundData>,
+  
 }
 
 interface RawWeekList {
@@ -72,6 +83,40 @@ var bm_ = {
     }, {} as Record<string, Week>)
 
     return bucket
+  },
+
+  getDays: async (week: Week) => {
+    // Songs: weeks/songs/<songame>.xml
+    let days: Record<string, Day> = {}
+    for (let [key, value] of Object.entries(week.songs)) {
+      days[key] = await bm_.getWeeks(value)
+        .then(res => res.text())
+        .then(res => {
+          return SML.MLtoJSON(res, 'text/xml') as Day
+        })
+    }
+    
+    return days
+  },
+
+  getPlaybacks: async (day: Day) => {
+    let days = await Promise.all(
+      Object.entries(day.playbacks).map(async ([key, value]) => {
+        return {
+          key,
+          value: await loadSound(key, value)
+        }
+      })
+    )
+
+    let dayObj = {} as DayLoaded
+
+    for (let { key, value } of days) {
+      dayObj[key] = value
+    }
+
+    return dayObj
+    
   },
 }
 

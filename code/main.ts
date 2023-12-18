@@ -1,5 +1,30 @@
 // KaboomFunkin' - A Funkin' Clone in Kaboom.js
 // © SpcFORK 2023 
+/* 
+    ,""""""""""""""""",^,"""""""""""",                  
+  .l ?]]]]]]]]]]]]]]]].~.????????????.I                 
+ ",!l]IIIIIIIIIIIIIIII,< ]]]]]]]]]]]] l                 
+ l ]]]lllllllllllllIII:> ]]]]]]]]]]]] l                 
+ l:iii>>>>>>>>>>>>>]]] ~ ]]]]]]]]]]]] l                 
+ l`++++++++++++++++---.~ ]]]]]]]]]]]] l                 
+ lIIIIIIIIIIIIIIIIIIII;~.??????----?? l                 
+ lIlllllllllllllllllll:iI"""""",;:;''l;".               
+ l;lllllllllllllllllll:l    '^,,Iii??]-i;".             
+ `I,I:::::::::I,,,,,,,:`   ,;ii??]]]]]]]-i",            
+   ,:iiiiiiiii:,          :IIii!!!!!!!?]]]I:"           
+   l ]]]]]]]]] l           ^`````````l.]]]] i           
+   l ]]]]]]]]] l                   .`l.]]]]?.I          
+   l.?]]]]]]]] l         ,""""""""";!!?]]]]] l          
+   `i ]]]]]]]] l        I.?????????-]]]]]]]I";          
+    ;:I]]]]]]]l;""""""",! ]]]]]]]]]]]]]]]?!^;           
+     I,i-]]]]]]-???????.~ ]]]]]]]]]]]]]?!,,^            
+      ^IIi?-]]]]]]]]]]] ~ ]]]]]]]]]]??!,,^              
+        ^I"I!!!!!!!!!!!">:!!!!!!!!!!,",^                
+           ^```````````^ ^``````````^
+
+"We we, y'all!"
+- tCOW/ICow
+*/
 
 import kaboom from "kaboom"
 import "kaboom/global"
@@ -46,7 +71,7 @@ const
   /* 
   INJECTOR PREPARATION
   */
-  
+
   [
     'WEEK_INJECTOR',
     'FREEPLAY_INJECTOR',
@@ -77,6 +102,7 @@ const
     ...createSafeSetter('SUPER_COMMON_COLOUR', SUPERCOMMONCOLOUR),
   })
 }
+
 
 let CHROMEOS_FIX = !navigator.userAgent.includes('CrOS')
 
@@ -753,7 +779,7 @@ class ScrollableMenu {
 
 var // tree
   notes = [],
-  ALLOWEDTOPLAYSOUND = false, 
+  ALLOWEDTOPLAYSOUND = false,
   awaitingFirstInput
 
 
@@ -872,8 +898,6 @@ scene('intro', async () => {
         - 200
       )
     )
-
-    // It's mountains!! - spc
 
     await sleep(sToMs(2))
     txToggle()
@@ -1119,7 +1143,7 @@ scene('credits', async () => {
 
   let txt_ = add([
     text('Loading...', {
-      size: 12*1.5,
+      size: 12 * 1.5,
       font: 'apl386',
       align: 'center',
     }),
@@ -1138,7 +1162,139 @@ Thanks for playing!
   txt_.height = height() - 64;
 
   await makeIntroTransition()
+
+})
+
+
+class LinearMenu {
+  /* 
+  option1 <
+  option2
+  option3
+  */
+
+  list: Record<string, Function> = {}
+  comps: Function[]
+  menu: any[]
+  scaler: number
+  ind: number
+
+  constructor(list: Record<string, Function>, ...comps: any) {
+    this._(list, ...comps)
+
+    this.construct()
+  }
+
+  construct() {
+    for (const [key, value] of Object.entries(this.list)) {
+      let txt = add([
+        text(key, {
+          size: 24,
+          // font: 'apl386',
+          align: 'center',
+        }),
+        // pos(width() / 2, height() / 2 + (this.menu.length * (height()) / 2)),
+        pos(width() / 2, height() / 2 + (this.menu.length * this.scaler)),
+        anchor('center'),
+        { WAS: { key, value } },
+        { MBSC: this.scaler * 2 }
+      ])
+
+      this.menu.push(txt)
+    }
+  }
+
+  async scroll(direction: string) {
+    let dir = direction == 'up'
+    let outsideBounds = this.ind + (dir ? 1 : -1) < 0 || this.ind + (dir ? 1 : -1) >= this.menu.length;
+
+    if (outsideBounds) return;
+    
+    this.menu.forEach((x, i) => {
+      if (dir) {
+        // x.pos.y -= (height() / this.menu.length)
+        x.pos.y -= (x.MBSC / this.menu.length)
+      } else {
+        x.pos.y += (x.MBSC / this.menu.length)
+      }
+
+      // let to_ = vec2(0, (dir ? 1 : -1) * (height() / this.menu.length))
+      //   .add(x.pos)
+
+      // let tween_ = tween(
+      //   x.pos.y,
+      //   to_.y,
+      //   1,
+      //   (v) => x.pos.y = v,
+      //   easings.easeInOutSine,
+      // )
+
+      if (i == this.ind + (dir ? 1 : -1)) {
+        x.color = YELLOW
+      } else {
+        x.color = WHITE
+      }
+
+    })
+
+    this.ind += (dir ? 1 : -1)
+  }
+
+  highlight(i) {
+    this.menu[i].color = YELLOW
+  }
+
+  _(list: Record<string, Function>, ...comps: any) {
+    this.list = list || {}
+    this.comps = comps || []
+    this.menu = []
+    this.scaler = 30
+    this.ind = 0
+  }
+
+  toggle(s?: boolean) {
+    for (const x of this.menu) {
+      x.hidden = s ?? !x.hidden
+    }
+  }
+
+}
+
+
+scene('options', async () => {
+
+  quickEvent.$(['options', 'init'])
+
+  let esc = createEscapeHandle('selectMenu')
+  let OSTATE = ['top']
+
+  let isState = (s: string) => OSTATE[OSTATE.length - 1] == s;
   
+  let bg = await createFG()
+  bg.use(z(-5))
+
+  let menu = new LinearMenu({
+    'Back': () => {
+      go('menu')
+    },
+    'Gameplay': () => {
+      go('menu')
+    },
+    "Controls": () => {}
+  })
+
+  onKeyPress('up', () => {
+    if (!isState('top')) return;
+    menu.scroll('down')
+  })
+
+  onKeyPress('down', () => {
+    if (!isState('top')) return;
+    menu.scroll('up')
+  })
+
+  menu.highlight(0)
+
 })
 
 

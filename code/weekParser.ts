@@ -1,36 +1,41 @@
 import SML from "./MLtoJSON"
 import * as kbg from "kaboom"
 
-interface Week {
+export interface Week {
 
   weekname: string,
-  topLeft: string,
-  songs: Record<string, string>,
+  topright: string,
+  songs: Record<string, string>
 
 }
 
-interface Day {
+export interface Day {
 
   characters: Record<string, string>,
   playbacks: Record<string, string>,
+  bpm: number,
+  mainside?: {
+    __text: string,
+    try: string,
+  }
   
 }
 
-interface DayLoaded {
+export interface DayLoaded {
 
   characters: Record<string, string>,
   playbacks: Record<string, kbg.SoundData>,
   
 }
 
-interface RawWeekList {
+export interface RawWeekList {
 
   weeklist: string,
   __text: string,
 
 }
 
-interface WeekList {
+export interface WeekList {
 
   weeklist: string,
   __text: Record<string, string>,
@@ -63,7 +68,7 @@ var bm_ = {
 
     // The raw xml is broken up into a bunch of text broken by new lines.
     // Let's split it up.
-    let split = weeks.__text.split(/(\r\n|\n|\r)/)
+    let split = weeks.__text.trim().split(/(\r\n|\n|\r)/)
 
     let promiseBucket = await Promise.all(split.map(async (week) => {
       let res_: Week = await bm_.getWeeks(week)
@@ -74,10 +79,21 @@ var bm_ = {
 
       return res_
     }))
-
+    
     // Map Array to Object
     let bucket = promiseBucket.reduce((acc, val) => {
       if (!val.weekname) val.weekname = Object.values(val)[0]
+      
+      Object.entries(val).forEach(([key, val_]) => {
+        let fixedKey = key.includes('/') ? (() => {
+          let o = key.split('/')
+          return o[o.length - 1]
+        })() : key || 'ERROR!!';
+        
+        val.songs[fixedKey] = val_
+        delete val.songs[key]
+      })
+      
       acc[val.weekname] = val
       return acc
     }, {} as Record<string, Week>)
@@ -89,7 +105,13 @@ var bm_ = {
     // Songs: weeks/songs/<songame>.xml
     let days: Record<string, Day> = {}
     for (let [key, value] of Object.entries(week.songs)) {
-      days[key] = await bm_.getWeeks(value)
+
+      // let fixedKey = key.includes('/') ? (() => {
+      //   let o = key.split('/')
+      //   return o[o.length - 1]
+      // })() : key || 'ERROR!!';
+      
+      days[fixedKey] = await bm_.getWeeks(value)
         .then(res => res.text())
         .then(res => {
           return SML.MLtoJSON(res, 'text/xml') as Day

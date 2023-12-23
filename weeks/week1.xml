@@ -2,10 +2,6 @@
 <data>
   <weekname>Week 1</weekname>
   <topright>"Oh, Dearest"</topright>
-  <characters>
-    <left>Beanfriend</left>
-    <right>Enemy</right>
-  </characters>
   <songs>
     <song1>weeks/songs/dadbattle</song1>
   </songs>

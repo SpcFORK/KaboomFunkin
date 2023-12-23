@@ -4419,7 +4419,7 @@ vec4 frag(vec2 pos, vec2 uv, vec4 color, sampler2D tex) {
           let weeks = yield bm_.getWeeks("weeks/storyweeks.xml").then((res) => res.text()).then((res) => {
             return MLtoJSON_default.MLtoJSON(res, "text/xml");
           });
-          let split = weeks.__text.split(/(\r\n|\n|\r)/);
+          let split = weeks.__text.trim().split(/(\r\n|\n|\r)/);
           let promiseBucket = yield Promise.all(split.map((week) => __async(void 0, null, function* () {
             let res_ = yield bm_.getWeeks(week).then((res) => res.text()).then((res) => {
               return MLtoJSON_default.MLtoJSON(res, "text/xml");
@@ -4429,6 +4429,14 @@ vec4 frag(vec2 pos, vec2 uv, vec4 color, sampler2D tex) {
           let bucket = promiseBucket.reduce((acc, val) => {
             if (!val.weekname)
               val.weekname = Object.values(val)[0];
+            Object.entries(val).forEach(([key, val_]) => {
+              let fixedKey2 = key.includes("/") ? (() => {
+                let o2 = key.split("/");
+                return o2[o2.length - 1];
+              })() : key || "ERROR!!";
+              val.songs[fixedKey2] = val_;
+              delete val.songs[key];
+            });
             acc[val.weekname] = val;
             return acc;
           }, {});
@@ -4437,20 +4445,26 @@ vec4 frag(vec2 pos, vec2 uv, vec4 color, sampler2D tex) {
         getDays: (week) => __async(void 0, null, function* () {
           let days = {};
           for (let [key, value] of Object.entries(week.songs)) {
-            days[key] = yield bm_.getWeeks(value).then((res) => res.text()).then((res) => {
+            days[fixedKey] = yield bm_.getWeeks(value).then((res) => res.text()).then((res) => {
               return MLtoJSON_default.MLtoJSON(res, "text/xml");
             });
           }
           return days;
         }),
         getPlaybacks: (day) => __async(void 0, null, function* () {
-          let playbacks = {};
-          for (let [key, value] of Object.entries(day.playbacks)) {
-            playbacks[key] = yield bm_.getWeeks(value).then((res) => res.text()).then((res) => {
-              return MLtoJSON_default.MLtoJSON(res, "text/xml");
-            });
+          let days = yield Promise.all(
+            Object.entries(day.playbacks).map((_0) => __async(void 0, [_0], function* ([key, value]) {
+              return {
+                key,
+                value: yield loadSound(key, value)
+              };
+            }))
+          );
+          let dayObj = {};
+          for (let { key, value } of days) {
+            dayObj[key] = value;
           }
-          return playbacks;
+          return dayObj;
         })
       };
       weekParser_default = bm_;
@@ -4580,6 +4594,7 @@ vec4 frag(vec2 pos, vec2 uv, vec4 color, sampler2D tex) {
           resolve(txts);
         })));
         loadSprite("menu_logo", "sprites/menu/menu.png");
+        loadSprite("loading_temp", "sprites/menu/BeanLoad.png");
         loadSprite("kaboom", "sprites/ka.png");
         loadSprite(
           "kaboom_bg",
@@ -4642,21 +4657,19 @@ vec4 frag(vec2 pos, vec2 uv, vec4 color, sampler2D tex) {
       }
       __name(drainOpacity, "drainOpacity");
       function createFG() {
-        return __async(this, null, function* () {
-          let fg = add([
-            rect(width(), height()),
-            color(0, 0, 0)
-          ]);
-          return fg;
-        });
+        let fg = add([
+          rect(width(), height()),
+          color(0, 0, 0)
+        ]);
+        return fg;
       }
       __name(createFG, "createFG");
       function makeTransition(color2) {
         return __async(this, null, function* () {
-          let fg = yield createFG();
+          let fg = createFG();
+          fg.use(opacity(0));
           if (color2)
             fg.use(color2);
-          fg.use(opacity(0));
           fg.use(fadeIn(0.5));
           yield sleep(800);
           return fg;
@@ -4777,7 +4790,9 @@ vec4 frag(vec2 pos, vec2 uv, vec4 color, sampler2D tex) {
             ]),
             weekbar: () => ({
               leftText: add([
-                text(Object.values(WEEKSONGS)[0].join("\n"), {
+                text(Object.values(WEEKSONGS)[0].map((k) => {
+                  return (k == null ? void 0 : k.includes("/")) ? k.split("/").pop() : k;
+                }).join("\n"), {
                   size: 20
                 }),
                 pos(segPosCenter(width(), 8, 75, 1), height() / 2 + 125),
@@ -4948,7 +4963,15 @@ vec4 frag(vec2 pos, vec2 uv, vec4 color, sampler2D tex) {
         scroll(amm) {
           for (let i = 0; i < this.buttons.length; i++) {
             let button = this.buttons[i];
-            button.pos.x -= amm;
+            if (button == null ? void 0 : button.tw)
+              button.tw.finish();
+            button.tw = tween(
+              button.pos.x,
+              button.pos.x - amm,
+              0.2,
+              (v) => button.pos.x = v,
+              easings.easeOutQuad
+            );
           }
         }
         amm(times = 1) {
@@ -5021,6 +5044,137 @@ vec4 frag(vec2 pos, vec2 uv, vec4 color, sampler2D tex) {
         }
       };
       __name(ScrollableMenu, "ScrollableMenu");
+      var LinearMenu = class {
+        constructor(list, ...comps) {
+          this.list = {};
+          this._(list, ...comps);
+          this.construct();
+        }
+        construct() {
+          for (const [key, value] of Object.entries(this.list)) {
+            let txt = add([
+              text(key, {
+                size: 24,
+                align: "center"
+              }),
+              pos(width() / 2, height() / 2 + this.menu.length * this.scaler),
+              anchor("center"),
+              { WAS: { key, value } },
+              { MBSC: this.scaler * 2 }
+            ]);
+            this.menu.push(txt);
+          }
+        }
+        scroll(direction) {
+          return __async(this, null, function* () {
+            let dir = direction == "up";
+            let outsideBounds = this.ind + (dir ? 1 : -1) < 0 || this.ind + (dir ? 1 : -1) >= this.menu.length;
+            if (outsideBounds)
+              return;
+            this.menu.forEach((x2, i) => {
+              if (dir) {
+                x2.pos.y -= x2.MBSC / this.menu.length;
+              } else {
+                x2.pos.y += x2.MBSC / this.menu.length;
+              }
+              if (i == this.ind + (dir ? 1 : -1)) {
+                x2.color = YELLOW;
+              } else {
+                x2.color = WHITE;
+              }
+            });
+            this.ind += dir ? 1 : -1;
+          });
+        }
+        highlight(i) {
+          this.menu[i].color = YELLOW;
+        }
+        _(list, ...comps) {
+          this.list = list || {};
+          this.comps = comps || [];
+          this.menu = [];
+          this.scaler = 30;
+          this.ind = 0;
+        }
+        toggle(s) {
+          for (const x2 of this.menu) {
+            x2.hidden = s != null ? s : !x2.hidden;
+          }
+        }
+      };
+      __name(LinearMenu, "LinearMenu");
+      var LinearMenuTween = class {
+        constructor(list, ...comps) {
+          this.list = {};
+          this._(list, ...comps);
+          this.construct();
+        }
+        construct() {
+          for (const [key, value] of Object.entries(this.list)) {
+            let txt = add([
+              text(key, {
+                size: 24,
+                align: "center"
+              }),
+              pos(width() / 2, height() / 2 + this.menu.length * this.scaler),
+              anchor("center"),
+              { WAS: { key, value } },
+              { MBSC: this.scaler * 2 }
+            ]);
+            this.menu.push(txt);
+          }
+        }
+        scroll(direction) {
+          return __async(this, null, function* () {
+            let dir = direction == "up";
+            let outsideBounds = this.ind + (dir ? 1 : -1) < 0 || this.ind + (dir ? 1 : -1) >= this.menu.length;
+            if (outsideBounds)
+              return;
+            let this_ = this;
+            this.menu.forEach((x2, i) => {
+              function tw(y) {
+                if (x2 == null ? void 0 : x2.tw)
+                  x2.tw.finish();
+                return x2.tw = tween(
+                  x2.pos.y,
+                  x2.pos.y + y,
+                  0.5,
+                  (v) => x2.pos.y = v,
+                  easings.easeOutQuad
+                );
+              }
+              __name(tw, "tw");
+              if (dir) {
+                tw(x2.MBSC / this.menu.length * -1);
+              } else {
+                tw(x2.MBSC / this.menu.length * 1);
+              }
+              if (i == this.ind + (dir ? 1 : -1)) {
+                x2.color = YELLOW;
+              } else {
+                x2.color = WHITE;
+              }
+            });
+            this.ind += dir ? 1 : -1;
+          });
+        }
+        highlight(i) {
+          this.menu[i].color = YELLOW;
+        }
+        _(list, ...comps) {
+          this.list = list || {};
+          this.comps = comps || [];
+          this.menu = [];
+          this.scaler = 30;
+          this.ind = 0;
+        }
+        toggle(s) {
+          for (const x2 of this.menu) {
+            x2.hidden = s != null ? s : !x2.hidden;
+          }
+        }
+      };
+      __name(LinearMenuTween, "LinearMenuTween");
       var ALLOWEDTOPLAYSOUND = false;
       var awaitingFirstInput;
       scene("songLoaded", () => {
@@ -5062,6 +5216,8 @@ vec4 frag(vec2 pos, vec2 uv, vec4 color, sampler2D tex) {
         let enterPress = onKeyPress("enter", gotoMenu);
         let MENU_FLAG = false;
         function gotoMenu() {
+          if (MENU_FLAG)
+            return;
           enterPress.cancel();
           MENU_FLAG = true;
           go("menu");
@@ -5142,13 +5298,18 @@ vec4 frag(vec2 pos, vec2 uv, vec4 color, sampler2D tex) {
             );
           }
         }));
+        let PRESSED_ALREADY = false;
         let enterPress = onKeyPress("enter", () => __async(exports, null, function* () {
           exit__();
+          if (PRESSED_ALREADY)
+            return;
+          PRESSED_ALREADY = true;
           let sound_ = play("confirmMenu", {
             volume: 0.5
           });
           let transi = yield makeTransition();
           yield sleep(sToMs(1));
+          enterPress.cancel();
           go("selectMenu");
         }));
         function exit__() {
@@ -5257,6 +5418,10 @@ vec4 frag(vec2 pos, vec2 uv, vec4 color, sampler2D tex) {
           console.log(weekbar.leftText.WEEKSONGS);
           tabs.top.topRightText.text = ((_a20 = tabs.top.topRightText.RIGHTTOPTEXTCHOICES) == null ? void 0 : _a20[ind]) || "";
           weekbar.leftText.text = ((_d = (_c = (_b = weekbar.leftText.WEEKSONGS) == null ? void 0 : _b[ind]) == null ? void 0 : _c.join) == null ? void 0 : _d.call(_c, "\n")) || "";
+          if (weekbar.leftText.text.includes("/")) {
+            let ind2 = weekbar.leftText.text.split("/");
+            weekbar.leftText.text = ind2[ind2.length - 1];
+          }
         }, "switchtexts");
         addEventListener("ScrollableMenu:up", switchtexts);
         addEventListener("ScrollableMenu:down", switchtexts);
@@ -5290,65 +5455,6 @@ Thanks for playing!
         txt_.height = height() - 64;
         yield makeIntroTransition();
       }));
-      var LinearMenu = class {
-        constructor(list, ...comps) {
-          this.list = {};
-          this._(list, ...comps);
-          this.construct();
-        }
-        construct() {
-          for (const [key, value] of Object.entries(this.list)) {
-            let txt = add([
-              text(key, {
-                size: 24,
-                align: "center"
-              }),
-              pos(width() / 2, height() / 2 + this.menu.length * this.scaler),
-              anchor("center"),
-              { WAS: { key, value } },
-              { MBSC: this.scaler * 2 }
-            ]);
-            this.menu.push(txt);
-          }
-        }
-        scroll(direction) {
-          return __async(this, null, function* () {
-            let dir = direction == "up";
-            let outsideBounds = this.ind + (dir ? 1 : -1) < 0 || this.ind + (dir ? 1 : -1) >= this.menu.length;
-            if (outsideBounds)
-              return;
-            this.menu.forEach((x2, i) => {
-              if (dir) {
-                x2.pos.y -= x2.MBSC / this.menu.length;
-              } else {
-                x2.pos.y += x2.MBSC / this.menu.length;
-              }
-              if (i == this.ind + (dir ? 1 : -1)) {
-                x2.color = YELLOW;
-              } else {
-                x2.color = WHITE;
-              }
-            });
-            this.ind += dir ? 1 : -1;
-          });
-        }
-        highlight(i) {
-          this.menu[i].color = YELLOW;
-        }
-        _(list, ...comps) {
-          this.list = list || {};
-          this.comps = comps || [];
-          this.menu = [];
-          this.scaler = 30;
-          this.ind = 0;
-        }
-        toggle(s) {
-          for (const x2 of this.menu) {
-            x2.hidden = s != null ? s : !x2.hidden;
-          }
-        }
-      };
-      __name(LinearMenu, "LinearMenu");
       scene("options", () => __async(exports, null, function* () {
         quickEvent_default.$(["options", "init"]);
         let esc = createEscapeHandle("selectMenu");
@@ -5377,6 +5483,46 @@ Thanks for playing!
           menu.scroll("up");
         });
         menu.highlight(0);
+      }));
+      scene("freeplay", () => __async(exports, null, function* () {
+        quickEvent_default.$(["options", "init"]);
+        let esc = createEscapeHandle("selectMenu");
+        let OSTATE = ["top"];
+        let isState = /* @__PURE__ */ __name((s) => OSTATE[OSTATE.length - 1] == s, "isState");
+        let bg = yield createFG();
+        bg.use(z(-5));
+        let menu = new LinearMenuTween({
+          "Back": () => {
+            go("menu");
+          },
+          "Gameplay": () => {
+            go("menu");
+          },
+          "Controls": () => {
+          }
+        });
+        menu.menu.forEach((e, i) => {
+          e.use(
+            text(e.text, {
+              size: 20,
+              align: "left"
+            })
+          );
+          e.anchor = "left";
+          e.use(pos(20, e.pos.y));
+        });
+        onKeyPress("up", () => {
+          if (!isState("top"))
+            return;
+          menu.scroll("down");
+        });
+        onKeyPress("down", () => {
+          if (!isState("top"))
+            return;
+          menu.scroll("up");
+        });
+        menu.highlight(0);
+        yield makeIntroTransition();
       }));
       go("intro");
     }

@@ -26,11 +26,11 @@
 - tCOW/ICow
 */
 
-import kaboom from "kaboom"
+import kaboom, * as kbg from "kaboom"
 import "kaboom/global"
 
 import SML from "./MLtoJSON"
-import bm_ from "./weekParser"
+import bm_, * as bmg from "./weekParser"
 import quickEvent from "./quickEvent"
 
 // initialize context
@@ -51,7 +51,7 @@ const
   GLOBAL_LOADED_FILES: {
     txts: string,
     RIGHTTOPTEXTCHOICES: object | string,
-    WEEKLIST: object | string,
+    WEEKLIST: Record<string, bmg.Week> | string,
     WEEKSONGS: object | string,
   } = {
     txts: '',
@@ -110,8 +110,8 @@ let CHROMEOS_FIX = !navigator.userAgent.includes('CrOS')
 // ---
 
 
+// @Preload
 {
-  // @Preload
   loadSpriteAtlas("sprites/game/characters/beanfriend.png", {
     bean: {
       x: 0,
@@ -174,6 +174,7 @@ let CHROMEOS_FIX = !navigator.userAgent.includes('CrOS')
   }))
 
   loadSprite('menu_logo', 'sprites/menu/menu.png')
+  loadSprite('loading_temp', 'sprites/menu/BeanLoad.png')
 
   loadSprite('kaboom', 'sprites/ka.png')
 
@@ -267,7 +268,7 @@ async function drainOpacity(sprite, duration: number): Promise<void> {
 }
 
 
-async function createFG() {
+function createFG() {
   let fg = add([
     rect(width(), height()),
     color(0, 0, 0),
@@ -276,9 +277,9 @@ async function createFG() {
 }
 
 async function makeTransition(color?: any) {
-  let fg = await createFG();
-  if (color) fg.use(color)
+  let fg = createFG();
   fg.use(opacity(0))
+  if (color) fg.use(color)
   fg.use(fadeIn(0.5))
 
   await sleep(800)
@@ -435,7 +436,11 @@ function createMenuStructure() {
           ...
           */
           add([
-            text(Object.values(WEEKSONGS)[0].join('\n'), {
+            text(Object.values(WEEKSONGS)[0].map((k) => {
+              return k?.includes('/')
+                ? k.split('/').pop()
+                : k
+            }).join('\n'), {
               size: 20,
             }),
             pos(segPosCenter(width(), 8, 75, 1), (height() / 2) + 125),
@@ -669,8 +674,15 @@ class ScrollableMenu {
     for (let i = 0; i < this.buttons.length; i++) {
       let button = this.buttons[i]
 
-      // Go up
-      button.pos.x -= amm
+      if (button?.tw) button.tw.finish()
+      
+      button.tw = tween(
+        button.pos.x,
+        button.pos.x - amm,
+        0.2,
+        (v) => button.pos.x = v,
+        easings.easeOutQuad,
+      );
     }
   }
 
@@ -773,6 +785,209 @@ class ScrollableMenu {
   }
 }
 
+class LinearMenu {
+  /* 
+  option1 <
+  option2
+  option3
+  */
+
+  list: Record<string, Function> = {}
+  comps: kbg.CompList<unknown>[]
+  menu: kbg.GameObj[]
+  scaler: number
+  ind: number
+
+  constructor(list: Record<string, Function>, ...comps: any) {
+    this._(list, ...comps)
+
+    this.construct()
+  }
+
+  construct() {
+    for (const [key, value] of Object.entries(this.list)) {
+      let txt = add([
+        text(key, {
+          size: 24,
+          // font: 'apl386',
+          align: 'center',
+        }),
+        // pos(width() / 2, height() / 2 + (this.menu.length * (height()) / 2)),
+        pos(width() / 2, height() / 2 + (this.menu.length * this.scaler)),
+        anchor('center'),
+        { WAS: { key, value } },
+        { MBSC: this.scaler * 2 }
+      ])
+
+      this.menu.push(txt)
+    }
+  }
+
+  async scroll(direction: string) {
+    let dir = direction == 'up'
+    let outsideBounds = this.ind + (dir ? 1 : -1) < 0 || this.ind + (dir ? 1 : -1) >= this.menu.length;
+
+    if (outsideBounds) return;
+
+    this.menu.forEach((x, i) => {
+      if (dir) {
+        // x.pos.y -= (height() / this.menu.length)
+        x.pos.y -= (x.MBSC / this.menu.length)
+      } else {
+        x.pos.y += (x.MBSC / this.menu.length)
+      }
+
+      // let to_ = vec2(0, (dir ? 1 : -1) * (height() / this.menu.length))
+      //   .add(x.pos)
+
+      // let tween_ = tween(
+      //   x.pos.y,
+      //   to_.y,
+      //   1,
+      //   (v) => x.pos.y = v,
+      //   easings.easeInOutSine,
+      // )
+
+      if (i == this.ind + (dir ? 1 : -1)) {
+        x.color = YELLOW
+      } else {
+        x.color = WHITE
+      }
+
+    })
+
+    this.ind += (dir ? 1 : -1)
+  }
+
+  highlight(i) {
+    this.menu[i].color = YELLOW
+  }
+
+  _(list: Record<string, Function>, ...comps: any) {
+    this.list = list || {}
+    this.comps = comps || []
+    this.menu = []
+    this.scaler = 30
+    this.ind = 0
+  }
+
+  toggle(s?: boolean) {
+    for (const x of this.menu) {
+      x.hidden = s ?? !x.hidden
+    }
+  }
+
+}
+
+class LinearMenuTween {
+  /* 
+  option1 <
+  option2
+  option3
+  */
+
+  list: Record<string, Function> = {}
+  comps: kbg.CompList<unknown>[]
+  menu: kbg.GameObj[]
+  scaler: number
+  ind: number
+
+  constructor(list: Record<string, Function>, ...comps: any) {
+    this._(list, ...comps)
+
+    this.construct()
+  }
+
+  construct() {
+    for (const [key, value] of Object.entries(this.list)) {
+      let txt = add([
+        text(key, {
+          size: 24,
+          // font: 'apl386',
+          align: 'center',
+        }),
+        // pos(width() / 2, height() / 2 + (this.menu.length * (height()) / 2)),
+        pos(width() / 2, height() / 2 + (this.menu.length * this.scaler)),
+        anchor('center'),
+        { WAS: { key, value } },
+        { MBSC: this.scaler * 2 }
+      ])
+
+      this.menu.push(txt)
+    }
+  }
+
+  async scroll(direction: string) {
+    let dir = direction == 'up'
+    let outsideBounds = this.ind + (dir ? 1 : -1) < 0 || this.ind + (dir ? 1 : -1) >= this.menu.length;
+
+    if (outsideBounds) return;
+
+    let this_ = this as typeof this & { tw: kbg.TweenController }
+
+    this.menu.forEach((x, i) => {
+      function tw(y: number) {
+        if (x?.tw) x.tw.finish()
+        return x.tw = tween(
+          x.pos.y,
+          x.pos.y + y,
+          0.5,
+          (v) => x.pos.y = v,
+          easings.easeOutQuad,
+        )
+      }
+
+      if (dir) {
+        // x.pos.y -= (height() / this.menu.length)
+        // x.pos.y -= (x.MBSC / this.menu.length)
+        tw((x.MBSC / this.menu.length) * -1)
+      } else {
+        // x.pos.y += (height() / this.menu.length)
+        // x.pos.y += (x.MBSC / this.menu.length)
+        tw((x.MBSC / this.menu.length) * 1)
+      }
+
+      // let to_ = vec2(0, (dir ? 1 : -1) * (height() / this.menu.length))
+      //   .add(x.pos)
+
+      // let tween_ = tween(
+      //   x.pos.y,
+      //   to_.y,
+      //   1,
+      //   (v) => x.pos.y = v,
+      //   easings.easeInOutSine,
+      // )
+
+      if (i == this.ind + (dir ? 1 : -1)) {
+        x.color = YELLOW
+      } else {
+        x.color = WHITE
+      }
+
+    })
+
+    this.ind += (dir ? 1 : -1)
+  }
+
+  highlight(i) {
+    this.menu[i].color = YELLOW
+  }
+
+  _(list: Record<string, Function>, ...comps: any) {
+    this.list = list || {}
+    this.comps = comps || []
+    this.menu = []
+    this.scaler = 30
+    this.ind = 0
+  }
+
+  toggle(s?: boolean) {
+    for (const x of this.menu) {
+      x.hidden = s ?? !x.hidden
+    }
+  }
+
+}
 
 // ---
 
@@ -841,6 +1056,7 @@ scene('intro', async () => {
 
   let MENU_FLAG = false;
   function gotoMenu() {
+    if (MENU_FLAG) return;
     enterPress.cancel()
     MENU_FLAG = true;
     go('menu')
@@ -971,8 +1187,12 @@ scene('menu', async () => {
     }
   });
 
+  let PRESSED_ALREADY = false;
   let enterPress = onKeyPress('enter', async () => {
     exit__()
+
+    if (PRESSED_ALREADY) return;
+    PRESSED_ALREADY = true;
 
     let sound_ = play('confirmMenu', {
       volume: 0.5,
@@ -981,6 +1201,7 @@ scene('menu', async () => {
     let transi = await makeTransition();
 
     await sleep(sToMs(1));
+    enterPress.cancel()
     go('selectMenu')
   })
 
@@ -1116,7 +1337,13 @@ scene('storyMode', async () => {
     console.log(weekbar.leftText.WEEKSONGS)
 
     tabs.top.topRightText.text = tabs.top.topRightText.RIGHTTOPTEXTCHOICES?.[ind] || ''
-    weekbar.leftText.text = weekbar.leftText.WEEKSONGS?.[ind]?.join?.('\n') || ''
+    weekbar.leftText.text = weekbar.leftText.WEEKSONGS?.[ind]
+      ?.join?.('\n') || ''
+
+    if (weekbar.leftText.text.includes('/')) {
+      let ind = weekbar.leftText.text.split('/')
+      weekbar.leftText.text = ind[ind.length - 1]
+    }
   }
 
   addEventListener('ScrollableMenu:up', switchtexts)
@@ -1166,101 +1393,6 @@ Thanks for playing!
 })
 
 
-class LinearMenu {
-  /* 
-  option1 <
-  option2
-  option3
-  */
-
-  list: Record<string, Function> = {}
-  comps: Function[]
-  menu: any[]
-  scaler: number
-  ind: number
-
-  constructor(list: Record<string, Function>, ...comps: any) {
-    this._(list, ...comps)
-
-    this.construct()
-  }
-
-  construct() {
-    for (const [key, value] of Object.entries(this.list)) {
-      let txt = add([
-        text(key, {
-          size: 24,
-          // font: 'apl386',
-          align: 'center',
-        }),
-        // pos(width() / 2, height() / 2 + (this.menu.length * (height()) / 2)),
-        pos(width() / 2, height() / 2 + (this.menu.length * this.scaler)),
-        anchor('center'),
-        { WAS: { key, value } },
-        { MBSC: this.scaler * 2 }
-      ])
-
-      this.menu.push(txt)
-    }
-  }
-
-  async scroll(direction: string) {
-    let dir = direction == 'up'
-    let outsideBounds = this.ind + (dir ? 1 : -1) < 0 || this.ind + (dir ? 1 : -1) >= this.menu.length;
-
-    if (outsideBounds) return;
-    
-    this.menu.forEach((x, i) => {
-      if (dir) {
-        // x.pos.y -= (height() / this.menu.length)
-        x.pos.y -= (x.MBSC / this.menu.length)
-      } else {
-        x.pos.y += (x.MBSC / this.menu.length)
-      }
-
-      // let to_ = vec2(0, (dir ? 1 : -1) * (height() / this.menu.length))
-      //   .add(x.pos)
-
-      // let tween_ = tween(
-      //   x.pos.y,
-      //   to_.y,
-      //   1,
-      //   (v) => x.pos.y = v,
-      //   easings.easeInOutSine,
-      // )
-
-      if (i == this.ind + (dir ? 1 : -1)) {
-        x.color = YELLOW
-      } else {
-        x.color = WHITE
-      }
-
-    })
-
-    this.ind += (dir ? 1 : -1)
-  }
-
-  highlight(i) {
-    this.menu[i].color = YELLOW
-  }
-
-  _(list: Record<string, Function>, ...comps: any) {
-    this.list = list || {}
-    this.comps = comps || []
-    this.menu = []
-    this.scaler = 30
-    this.ind = 0
-  }
-
-  toggle(s?: boolean) {
-    for (const x of this.menu) {
-      x.hidden = s ?? !x.hidden
-    }
-  }
-
-}
-
-
 scene('options', async () => {
 
   quickEvent.$(['options', 'init'])
@@ -1269,7 +1401,7 @@ scene('options', async () => {
   let OSTATE = ['top']
 
   let isState = (s: string) => OSTATE[OSTATE.length - 1] == s;
-  
+
   let bg = await createFG()
   bg.use(z(-5))
 
@@ -1280,7 +1412,7 @@ scene('options', async () => {
     'Gameplay': () => {
       go('menu')
     },
-    "Controls": () => {}
+    "Controls": () => { }
   })
 
   onKeyPress('up', () => {
@@ -1297,6 +1429,55 @@ scene('options', async () => {
 
 })
 
+
+scene('freeplay', async () => {
+  quickEvent.$(['options', 'init'])
+
+  let esc = createEscapeHandle('selectMenu')
+  let OSTATE = ['top']
+
+  let isState = (s: string) => OSTATE[OSTATE.length - 1] == s;
+
+  let bg = await createFG()
+  bg.use(z(-5))
+
+  let menu = new LinearMenuTween({
+    'Back': () => {
+      go('menu')
+    },
+    'Gameplay': () => {
+      go('menu')
+    },
+    "Controls": () => { }
+  })
+
+  // We casually mod our menu.
+  menu.menu.forEach((e, i) => {
+    e.use(
+      text(e.text, {
+        size: 20,
+        align: 'left',
+      })
+    )
+
+    e.anchor = 'left'
+    e.use(pos(20, e.pos.y))
+  })
+
+  onKeyPress('up', () => {
+    if (!isState('top')) return;
+    menu.scroll('down')
+  })
+
+  onKeyPress('down', () => {
+    if (!isState('top')) return;
+    menu.scroll('up')
+  })
+
+  menu.highlight(0)
+
+  await makeIntroTransition()
+})
 
 // ---
 

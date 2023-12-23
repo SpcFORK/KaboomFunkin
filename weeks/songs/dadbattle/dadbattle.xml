@@ -7,4 +7,6 @@
     <left>Beanfriend</left>
     <right>Enemy</right>
   </characters>
+  <bpm>120</bpm>
+  <mainside try="true">right</mainside>
 </data>
